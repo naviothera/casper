@@ -1,0 +1,151 @@
+# Pipelines:
+
+## dev -> test & publish
+## (all other) -> test & publish-snapshot
+
+# Stages
+
+stages:
+  - test
+  - publish
+
+# Variables
+
+variables:
+  CICD_IMAGE: ${CI_REGISTRY}/naviothera/product/quantumsoft/shared-docker-images/cicd:latest
+  POSTGRES_IMAGE: 'postgres:10.6-alpine'
+  TEST_POSTGRES_DB_NAME: navio_test
+  TEST_POSTGRES_PASSWORD: test
+  TEST_POSTGRES_USER: test
+
+# Templates
+
+.test_template: &test_definition
+  stage: test
+  image: ${CICD_IMAGE}
+  variables:
+    DOCKER_DRIVER: overlay2
+  services:
+    - docker:19.03.5-dind
+  script:
+    - docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY}
+    - source ci-env-setup.sh
+    - source ci-setup-backend-build-cache.sh
+    - |
+      Print_CI_Message "BUILDING TEST IMAGE"
+      export TEST_BUILD_TAG="${CI_REGISTRY_IMAGE}:test-${CI_COMMIT_SHA}"
+      docker build \
+        --target sources \
+        --cache-from ${CACHE_FROM_IMAGE} \
+        -t ${TEST_BUILD_TAG} .
+    - |
+      Print_CI_Message "SPINNING UP SUPPORTING SERVICES"
+      docker run \
+        --hostname postgres \
+        --name ${CI_PROJECT_NAME}-postgres-${CI_COMMIT_SHA} \
+        --env POSTGRES_USER=${TEST_POSTGRES_USER} \
+        --env POSTGRES_PASSWORD=${TEST_POSTGRES_PASSWORD} \
+        --env POSTGRES_DB=${TEST_POSTGRES_DB_NAME} \
+        -d ${POSTGRES_IMAGE}
+      sleep 5
+    - |
+      Print_CI_Message "RUNNING TESTS"
+      mkdir -p build/test-results
+      mkdir -p build/reports
+      docker run \
+        --rm \
+        --mount type=bind,source="$(pwd)"/build/test-results,target=/app/build/test-results \
+        --mount type=bind,source="$(pwd)"/build/reports,target=/app/build/reports \
+        --link ${CI_PROJECT_NAME}-postgres-${CI_COMMIT_SHA}:postgres \
+        --env DB_NAME=${TEST_POSTGRES_DB_NAME} \
+        --env DB_USERNAME=${TEST_POSTGRES_USER} \
+        --env DB_PASSWORD=${TEST_POSTGRES_PASSWORD} \
+        --env DB_HOST=postgres \
+        --env DB_PORT=5432 \
+        ${TEST_BUILD_TAG} gradle test
+      docker rm -f ${CI_PROJECT_NAME}-postgres-${CI_COMMIT_SHA} || true
+  after_script:
+    - docker rm -f ${CI_PROJECT_NAME}-postgres-${CI_COMMIT_SHA} || true
+  artifacts:
+    reports:
+      junit: build/test-results/test/TEST-*.xml
+    paths:
+      - build/reports/**
+
+
+### Run tests for all branches and tags on the shared builders
+
+test:
+  <<: *test_definition
+  tags:
+    - shared
+    - docker
+
+### Build tags and push to maven repo
+
+publish:
+  stage: publish
+  image: ${CICD_IMAGE}
+  variables:
+    DOCKER_DRIVER: overlay2
+  services:
+    - docker:19.03.5-dind
+  script:
+    - docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY}
+    - source ci-env-setup.sh
+    - source ci-setup-backend-build-cache.sh
+    - |
+      Print_CI_Message "BUILDING DOCKER IMAGE"
+      export IMAGE_TAG=${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_NAME}
+      docker build \
+          --cache-from ${CACHE_FROM_IMAGE} \
+          --target sources \
+          -t ${IMAGE_TAG} .
+    - |
+      export ARTIFACT_VERSION="$(echo ${CI_COMMIT_REF_NAME} | sed 's/^v\(.*\)/\1/')"
+      Print_CI_Message "PUBLISHING LIVE VERSION TO ${MAVEN_REPO_URL}"
+      docker run --rm \
+        --env MAVEN_REPO_URL=${MAVEN_REPO_URL} \
+        --env MAVEN_REPO_USERNAME=${MAVEN_REPO_USERNAME} \
+        --env MAVEN_REPO_PASSWORD=${MAVEN_REPO_PASSWORD} \
+        ${IMAGE_TAG} gradle publish
+    - docker rmi -f ${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_NAME} || true
+  tags:
+    - shared
+    - docker
+  only:
+    - dev
+
+publish-branch:
+  stage: publish
+  image: ${CICD_IMAGE}
+  variables:
+    DOCKER_DRIVER: overlay2
+  services:
+    - docker:19.03.5-dind
+  script:
+    - docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY}
+    - source ci-env-setup.sh
+    - source ci-setup-backend-build-cache.sh
+    - |
+      Print_CI_Message "BUILDING DOCKER IMAGE"
+      export IMAGE_TAG=${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_NAME}
+      docker build \
+          --cache-from ${CACHE_FROM_IMAGE} \
+          --target sources \
+          -t ${IMAGE_TAG} .
+    - |
+      export ARTIFACT_VERSION="$(echo ${CI_COMMIT_REF_NAME} | sed 's/^v\(.*\)/\1/')"
+      Print_CI_Message "PUBLISHING ${CI_COMMIT_REF_NAME}-SNAPSHOT VERSIONS TO ${MAVEN_REPO_URL}"
+      docker run --rm \
+        --env MAVEN_REPO_URL=${MAVEN_REPO_URL} \
+        --env MAVEN_REPO_USERNAME=${MAVEN_REPO_USERNAME} \
+        --env MAVEN_REPO_PASSWORD=${MAVEN_REPO_PASSWORD} \
+        --env CI_COMMIT_REF_NAME=${CI_COMMIT_REF_NAME} \
+        ${IMAGE_TAG} gradle -PbranchPublicationName=${CI_COMMIT_REF_NAME} publish
+    - docker rmi -f ${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_NAME} || true
+  tags:
+    - shared
+    - docker
+  except:
+    - dev
