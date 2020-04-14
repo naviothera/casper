@@ -1,0 +1,38 @@
+##########################################################################################
+# Base Query and Mutations
+##########################################################################################
+type MyUser {
+    # User Id
+    id: Int!
+
+    # String name
+    name: String!
+}
+
+# Root query type
+type Query {
+
+    # Graphql requires a type to have at least one method.
+    ping:String
+
+    findUser(id: Int!): MyUser!
+
+    listUsers: [MyUser!]!
+}
+
+input CreateUser {
+    # User name
+    name: String!
+}
+
+# Root mutation type
+type Mutation {
+    # Graphql requires a type to have at least one method.
+    ping:String
+
+    createUser(id: Int!, name: String!): MyUser!
+
+    updateUser(id: Int!, name: String!): MyUser!
+
+    deleteUser(id: Int!): MyUser!
+}

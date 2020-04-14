@@ -1,0 +1,7 @@
+build
+.gradle
+settings.gradle
+*.DS_Store
+.idea
+out/
+**/.env
