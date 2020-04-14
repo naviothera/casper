@@ -26,7 +26,7 @@ each other (and hopefully the use of the library is itself friendly).
 
 ## How to Use Casper
 You can bring Casper into a project as a dependency using our maven repository with:
-```compile "com.navio.apollo:apollo-framework-casper:1.0.0"```
+```compile "com.navio.apollo:apollo-framework-casper:1.00.00"```
 
 ### Integrating Casper for Testing
 The Casper repository contains a working example of a Spring Boot Application with
