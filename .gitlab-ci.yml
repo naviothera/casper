@@ -114,7 +114,7 @@ publish:
     - shared
     - docker
   only:
-    - dev
+    - master
 
 publish-branch:
   stage: publish
@@ -148,4 +148,4 @@ publish-branch:
     - shared
     - docker
   except:
-    - dev
+    - master
