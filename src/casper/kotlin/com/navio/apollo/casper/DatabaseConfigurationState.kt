@@ -38,7 +38,8 @@ sealed class DatabaseConfigurationState {
              * @param datasource a DataSource that is currently connected to the database that will become the template
              *  for test databases that utilize the same fixtures; note that it is generally not necessary to use the
              *  DataSource directly -- calls to Spring managed components such as JPA Repositories or direct EntityManager
-             *  use should work to initialize the template database within the scope of this function
+             *  use should work to initialize the template database within the scope of this function, however a transaction
+             *  will need to be set up.  The EntityManagerTransactionContext can be used to do this simply if desired.
              */
             abstract fun initialize(templateName: String, datasource: DataSource)
         }

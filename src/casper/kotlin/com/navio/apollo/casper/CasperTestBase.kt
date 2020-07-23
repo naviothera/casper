@@ -12,6 +12,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.AutoConfigureDataJpa
 import org.springframework.boot.test.autoconfigure.orm.jpa.AutoConfigureTestEntityManager
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.junit4.SpringRunner
+import javax.inject.Inject
 
 /**
  * Base class for tests that utilize persistent database state. Also exposes a GraphQLTestTemplate to allow interaction
@@ -52,6 +53,9 @@ abstract class CasperTestBase {
 
     @Autowired
     private lateinit var dsManager: TestIsolatedTemplatizingDatabaseManager
+
+    @Inject
+    private lateinit var entityManagerTransactionContext: EntityManagerTransactionContext
 
     /**
      * Test setup method invoked during the before method phase to gather the fixture template
@@ -98,7 +102,7 @@ abstract class CasperTestBase {
             is IsolatedTestTemplate -> {
                 log.info("Test ${testDescription.fullClassAndMethodName()} executing with isolated db: ${testContext.dbName}")
                 // The Isolated test Database is ready, proceed with any local setup
-                localSetUp(testContext)
+                entityManagerTransactionContext.inTransaction { localSetUp(testContext) }
             }
             else -> throw IllegalStateException("Expected to have test database initialized into context?")
         }
