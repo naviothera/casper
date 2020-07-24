@@ -3,11 +3,6 @@ package com.navio.apollo.casper
 import com.navio.apollo.casper.DatabaseConfigurationState.IsolatedTestTemplate
 import com.navio.apollo.casper.DatabaseConfigurationState.Uninitialized
 import com.navio.apollo.memoOf
-import java.io.Closeable
-import java.sql.Connection
-import java.util.Optional
-import java.util.concurrent.ConcurrentHashMap
-import javax.sql.DataSource
 import org.apache.commons.lang3.RandomStringUtils
 import org.flywaydb.core.Flyway
 import org.slf4j.LoggerFactory
@@ -16,6 +11,11 @@ import org.springframework.boot.jdbc.DataSourceBuilder
 import org.springframework.context.annotation.PropertySource
 import org.springframework.context.annotation.Scope
 import org.springframework.stereotype.Component
+import java.io.Closeable
+import java.sql.Connection
+import java.util.Optional
+import java.util.concurrent.ConcurrentHashMap
+import javax.sql.DataSource
 
 /**
  * Mapping Component containing all of the configured DataSources as well as the means of creating
@@ -52,6 +52,12 @@ class TestIsolatedTemplatizingDatabaseManager {
                 return uniqueVal
             }
         }
+
+        /** Mapping of Database names to DataSources */
+        private val constructedSources = ConcurrentHashMap<String, DataSource>()
+
+        /** Mapping of template ids (as known by the app) to Database names as constructed. */
+        private val activeTemplates = ConcurrentHashMap<TemplateId, String>()
     }
 
     @Value("\${spring.datasource.driver-class-name}")
@@ -76,12 +82,6 @@ class TestIsolatedTemplatizingDatabaseManager {
 
     @Value("\${casper.drop-test-dbs:true}")
     private var dropTestDatabases: Boolean = true
-
-    /** Mapping of Database names to DataSources */
-    private val constructedSources = ConcurrentHashMap<String, DataSource>()
-
-    /** Mapping of template ids (as known by the app) to Database names as constructed. */
-    private val activeTemplates = ConcurrentHashMap<TemplateId, String>()
 
     /**
      * A memoizing supplier for the base TemplateID derived from either a configured template name if
