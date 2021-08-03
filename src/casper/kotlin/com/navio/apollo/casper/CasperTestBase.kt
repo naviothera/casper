@@ -67,21 +67,32 @@ abstract class CasperTestBase {
     abstract fun getTestTemplate(): DatabaseConfigurationState.TemplateConfiguration
 
     /**
+     * Callback to the test class to allow set up of any injected resources prior to setting up the db state on
+     * a per test basis. This happens before each test (using @Before).
+     *
+     * If this does not need to happen before each you might consider @BeforeClass for static setup or @PostConstruct
+     * for setup that requires injected resources.
+     *
+     * Implementations that override this method SHOULD call beforeDbSetup on the super class.
+     */
+    fun beforeDbSetup() {}
+
+    /**
      * Callback to the test class to indicate that fixture data has been loaded and any additional per-test
      * configuration can now proceed using those resources.  This happens before each test (using @Before).
      *
-     * Implementations that override this method MUST be call localSetup on the super class.
+     * Implementations that override this method SHOULD call localSetup on the super class.
      *
      * @param testTemplate the isolated test template configured for this test
      */
-    fun localSetUp(testTemplate: IsolatedTestTemplate){}
+    fun localSetUp(testTemplate: IsolatedTestTemplate) {}
 
     /**
      * Callback after each test has completed execution (using @After).
      *
-     * Implementations that override this method MUST be call localSetup on the super class.
+     * Implementations that override this method SHOULD call localTearDown on the super class.
      */
-    fun localTearDown(){}
+    fun localTearDown() {}
 
     /**
      * Locally exposed capture of the JUnit Description for the executing test.
@@ -95,6 +106,7 @@ abstract class CasperTestBase {
      */
     @Before
     fun setUp() {
+        beforeDbSetup()
         val testContext = dsManager.initializeTestDb(getTestTemplate())
         // Get the new CasperTestContext that has been initialized and set a custom GraphQL header value
         // that we can intercept on the web server to set the unique DB context there
