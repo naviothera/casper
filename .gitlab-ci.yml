@@ -14,7 +14,7 @@ variables:
 # Basic library publishing tasks for test/publish
 include:
   - project: 'naviothera/deployment'
-    ref: NPA-1977_stop-the-world-enhancements
+    ref: master
     file:
       - '/lib-with-pg-test-definition.yaml'
       - '/app-tests.yaml'
