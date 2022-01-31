@@ -11,22 +11,32 @@ plugins {
     id("org.springframework.boot")
     id("io.spring.dependency-management")
     id("maven-publish")
-    id("org.jlleitschuh.gradle.ktlint") version "9.0.0"
+    id("org.jlleitschuh.gradle.ktlint") version "10.2.0"
     kotlin("jvm")
     kotlin("plugin.spring")
     kotlin("plugin.jpa")
     kotlin("plugin.noarg")
     kotlin("plugin.allopen")
     kotlin("kapt")
-    id("org.flywaydb.flyway") version "6.0.4"
+    id("org.jetbrains.dokka") version "1.5.0"
+    id("org.flywaydb.flyway") version "8.0.5"
+    signing
 }
 
-java.sourceCompatibility = JavaVersion.VERSION_1_8
+java.sourceCompatibility = JavaVersion.VERSION_11
 
 repositories {
     jcenter()
     mavenCentral()
     mavenLocal()
+}
+
+ktlint {
+    disabledRules.add("import-ordering")
+    filter {
+        exclude("build/generated/**")
+        include("src/**/kotlin/**/*.kt")
+    }
 }
 
 // For caching in CI/CD pipelines, from here: https://gist.github.com/matthiasbalke/3c9ecccbea1d460ee4c3fbc5843ede4a
@@ -60,7 +70,7 @@ kapt {
 tasks.withType<KotlinCompile> {
     kotlinOptions {
         freeCompilerArgs = listOf("-Xjsr305=strict")
-        jvmTarget = "1.8"
+        jvmTarget = "11"
     }
 }
 
@@ -70,25 +80,31 @@ dependencies {
     implementation(kotlin("stdlib-jdk8"))
     implementation("org.slf4j:slf4j-api:1.7.26")
     implementation("javax.inject:javax.inject:1")
-    implementation("org.postgresql:postgresql:42.2.2")
+    implementation("org.postgresql:postgresql:42.3.1")
 
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-json")
     implementation("org.springframework.boot:spring-boot-starter-test")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 
-    implementation("com.graphql-java-kickstart:graphql-spring-boot-starter:5.10.0")
-    implementation("com.graphql-java-kickstart:graphiql-spring-boot-starter:5.10.0")
-    implementation("com.graphql-java-kickstart:graphql-spring-boot-starter-test:5.10.0")
+    implementation("com.graphql-java-kickstart:graphql-spring-boot-starter:12.0.0")
+    implementation("com.graphql-java-kickstart:graphiql-spring-boot-starter:11.1.0")
+    implementation("com.graphql-java-kickstart:graphql-spring-boot-starter-test:12.0.0")
+    implementation("com.graphql-java:graphql-java:17.3")
 
-    implementation("org.flywaydb:flyway-core:6.1.3")
+    // TODO: these really should be test dependencies, but graphql-spring-boot-starter seems to bring them in as implementation deps, and uses the wrong version.
+    implementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
+    implementation("org.springframework.boot:spring-boot-test")
+    testImplementation("org.springframework.boot:spring-boot-test")
+
+    implementation("org.flywaydb:flyway-core:8.0.5")
 
     implementation("org.hibernate:hibernate-jpamodelgen:5.3.7.Final")
     kapt("org.hibernate:hibernate-jpamodelgen:5.3.7.Final")
     implementation("com.vladmihalcea:hibernate-types-52:2.6.1")
     implementation("net.logstash.logback:logstash-logback-encoder:6.2")
     testImplementation(kotlin("test"))
-    testImplementation(kotlin("test-junit"))
 
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.10.1")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.10.1")
@@ -115,18 +131,21 @@ dependencies {
     casperImplementation(kotlin("stdlib-jdk8"))
     casperImplementation("org.slf4j:slf4j-api:1.7.26")
     casperImplementation("javax.inject:javax.inject:1")
-    casperImplementation("org.postgresql:postgresql:42.2.2")
+    casperImplementation("org.postgresql:postgresql:42.3.1")
     casperImplementation("org.springframework.boot:spring-boot-starter-web")
     casperImplementation("org.springframework.boot:spring-boot-starter-json")
     casperImplementation("org.springframework.boot:spring-boot-starter-test")
     casperImplementation("org.springframework.boot:spring-boot-starter-data-jpa")
-    casperImplementation("com.graphql-java-kickstart:graphql-spring-boot-starter:5.10.0")
-    casperImplementation("com.graphql-java-kickstart:graphiql-spring-boot-starter:5.10.0")
-    casperImplementation("com.graphql-java-kickstart:graphql-spring-boot-starter-test:5.10.0")
-    casperImplementation("org.flywaydb:flyway-core:6.1.3")
+    casperImplementation("com.graphql-java-kickstart:graphql-spring-boot-starter:12.0.0")
+    casperImplementation("com.graphql-java-kickstart:graphiql-spring-boot-starter:11.1.0")
+    casperImplementation("com.graphql-java-kickstart:graphql-spring-boot-starter-test:12.0.0")
+    casperImplementation("com.graphql-java:graphql-java:17.3")
+    casperImplementation("org.flywaydb:flyway-core:8.0.5")
 }
 
 tasks.test {
+    useJUnitPlatform()
+    dependsOn(tasks.ktlintCheck)
     jvmArgs = listOf("-Duser.timezone=UTC")
 }
 
@@ -149,7 +168,8 @@ val artifactMap = mapOf(
     "apollo-framework-casper" to mapOf(
         "version" to getArtifactVersion(version, branchPublicationName, snapshot),
         "groupId" to "${project.group}",
-        "taskName" to "buildMain",
+        "libTaskName" to "buildMain",
+        "srcTaskName" to "buildSrc",
         "taskDescription" to "Build jar from core graphql schema files",
         "sourceSet" to "casper",
         "publicationName" to "Core"
@@ -157,10 +177,14 @@ val artifactMap = mapOf(
 )
 
 val publicationsMap = mutableMapOf<String, Map<String, Any>>()
+tasks.dokkaJavadoc.configure {
+    outputDirectory.set(buildDir.resolve("dokka"))
+}
 
 artifactMap.map { (artifactName, map) ->
     // build jar
-    val jar = tasks.create<Jar>(map.getValue("taskName")) {
+    val jar = tasks.create<Jar>(map.getValue("libTaskName")) {
+        dependsOn(tasks.dokkaJavadoc)
         archiveBaseName.set(artifactName)
         archiveVersion.set(map.getValue("version"))
         description = map.getValue("taskDescription").toString()
@@ -169,12 +193,92 @@ artifactMap.map { (artifactName, map) ->
             include("**")
         }
     }
+    val src = tasks.create<Jar>(map.getValue("srcTaskName")) {
+        archiveBaseName.set(artifactName)
+        archiveClassifier.set("sources")
+        archiveVersion.set(map.getValue("version"))
+        description = map.getValue("taskDescription").toString()
+        val sourceSet = map.get("sourceSet") ?: "main"
+        from(sourceSets[sourceSet].allSource) {
+            include("**")
+        }
+    }
+    val dokkaOutDir = buildDir.resolve("dokka/${map.get("sourceSet") ?: "main"}")
+    tasks.dokkaJavadoc.configure {
+        outputDirectory.set(dokkaOutDir)
+        dokkaSourceSets {
+            named(map.get("sourceSet") ?: "main") { // Or source set name, for single-platform the default source sets are `main` and `test`
+                // Used to remove a source set from documentation, test source sets are suppressed by default
+                suppress.set(false)
+
+                // Use to include or exclude non public members
+                includeNonPublic.set(false)
+
+                // Do not output deprecated members. Applies globally, can be overridden by packageOptions
+                skipDeprecated.set(false)
+
+                // Emit warnings about not documented members. Applies globally, also can be overridden by packageOptions
+                reportUndocumented.set(true)
+
+                // Do not create index pages for empty packages
+                skipEmptyPackages.set(true)
+
+                // This name will be shown in the final output
+                displayName.set("JVM")
+
+                // Platform used for code analysis. See the "Platforms" section of this readme
+                platform.set(org.jetbrains.dokka.Platform.jvm)
+
+                // Set the sourceRoots for the artifact
+                val realSource = file("$rootDir/src/${map.get("sourceSet") ?: "main"}/kotlin")
+                sourceRoots.from(realSource)
+
+                // Specifies the location of the project source code on the Web.
+                // If provided, Dokka generates "source" links for each declaration.
+                // Repeat for multiple mappings
+                /*sourceLink {
+                    // Unix based directory relative path to the root of the project (where you execute gradle respectively).
+                    localDirectory.set(file("src/main/kotlin"))
+
+                    // URL showing where the source code can be accessed through the web browser
+                    remoteUrl.set(
+                        java.net.URL(
+                            "https://github.com/cy6erGn0m/vertx3-lang-kotlin/blob/master/src/main/kotlin"
+                        )
+                    )
+                    // Suffix which is used to append the line number to the URL. Use #L for GitHub
+                    remoteLineSuffix.set("#L")
+                }*/
+
+                // Used for linking to JDK documentation
+                jdkVersion.set(11)
+                // Disable linking to online kotlin-stdlib documentation
+                noStdlibLink.set(false)
+                // Disable linking to online JDK documentation
+                noJdkLink.set(false)
+                // Include generated files in documentation
+                // By default Dokka will omit all files in folder named generated that is a child of buildDir
+                suppressGeneratedFiles.set(false)
+            }
+        }
+    }
+    val docs = tasks.create<Jar>("javadocs") {
+        archiveBaseName.set(artifactName)
+        archiveClassifier.set("javadoc")
+        archiveVersion.set(map.getValue("version"))
+        description = map.getValue("taskDescription").toString()
+        from(dokkaOutDir) {
+            include("**")
+        }
+    }
     // prepare publications map
     publicationsMap.put(
         map.getValue("publicationName"),
         mapOf(
             "artifactId" to artifactName,
-            "artifact" to jar,
+            "library" to jar,
+            "src" to src,
+            "docs" to docs,
             "artifactVersion" to map.getValue("version"),
             "groupId" to map.getValue("groupId")
         )
@@ -197,8 +301,40 @@ publishing {
                 groupId = publication.getValue("groupId").toString()
                 version = publication.getValue("artifactVersion").toString()
                 artifactId = publication.getValue("artifactId").toString()
-                artifact(publication.getValue("artifact"))
+                artifact(publication.getValue("library"))
+                artifact(publication.getValue("src"))
+                artifact(publication.getValue("docs"))
+                pom {
+                    this.description.set("A library for testing Spring GraphQL endpoints backed by Postgres with per-test isolation and shared database templating.")
+                    this.url.set("https://gitlab.com/naviothera/product/apollo-framework-casper")
+                    /*properties.set(mapOf(
+                        "myProp" to "value",
+                        "prop.with.dots" to "anotherValue"
+                    ))*/
+                    licenses {
+                        license {
+                            this.name.set("The Apache License, Version 2.0")
+                            this.url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+                        }
+                    }
+                    developers {
+                        developer {
+                            this.name.set("Zack Radick")
+                            this.id.set("zradick")
+                            this.email.set("zradick@navio.com")
+                        }
+                    }
+                    scm {
+                        this.connection.set("scm:git:git@gitlab.com:naviothera/product/apollo-framework-casper.git")
+                        this.developerConnection.set("scm:git:git@gitlab.com:naviothera/product/apollo-framework-casper.git")
+                        this.url.set("https://gitlab.com/naviothera/product/apollo-framework-casper")
+                    }
+                }
             }
         }
     }
 }
+/*
+signing {
+    sign(publishing.publications["mavenJava"])
+}*/

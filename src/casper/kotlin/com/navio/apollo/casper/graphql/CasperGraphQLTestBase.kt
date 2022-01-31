@@ -20,10 +20,10 @@ abstract class CasperGraphQLTestBase : CasperTestBase() {
     override fun localSetUp(testTemplate: DatabaseConfigurationState.IsolatedTestTemplate) {
         // Any additional local setup can now proceed with the entities we have already persisted
         log.debug("Setting GraphQLTemplate header: ${testTemplate.dbName}")
-        graphQLTestTemplate.addHeader(TEST_DB_HEADER, testTemplate.dbName)
+        graphQLTestTemplate.withAdditionalHeader(TEST_DB_HEADER, testTemplate.dbName)
     }
 
     override fun localTearDown() {
-        graphQLTestTemplate.clearHeaders()
+        graphQLTestTemplate.withClearHeaders()
     }
 }

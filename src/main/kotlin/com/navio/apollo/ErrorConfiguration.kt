@@ -2,8 +2,8 @@ package com.navio.apollo
 
 import graphql.ExceptionWhileDataFetching
 import graphql.GraphQLError
-import graphql.servlet.core.DefaultGraphQLErrorHandler
-import graphql.servlet.core.GraphQLErrorHandler
+import graphql.kickstart.execution.error.DefaultGraphQLErrorHandler
+import graphql.kickstart.execution.error.GraphQLErrorHandler
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 

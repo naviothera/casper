@@ -31,10 +31,10 @@ data class CasperEnabledUrls(val urls: Collection<String>)
 class ApiFilterRegistrationConfiguration @Autowired constructor(private val factory: AutowireCapableBeanFactory) : WebMvcConfigurer {
 
     @Inject
-    lateinit var enabledUrls : CasperEnabledUrls
+    lateinit var enabledUrls: CasperEnabledUrls
 
     override fun configureDefaultServletHandling(configurer: DefaultServletHandlerConfigurer) {
-        configurer.enable()
+        configurer.enable("default")
     }
 
     @Bean
@@ -60,8 +60,12 @@ class ApiFilterRegistrationConfiguration @Autowired constructor(private val fact
         override fun doFilter(request: ServletRequest?, response: ServletResponse?, chain: FilterChain?) {
             val apiInterceptor = TestIsolatedDatabaseRoutingFilter()
             val handler = HandlerMethod(
-                EmptyHandler(), ClassUtils.getMethod(
-                    EmptyHandler::class.java, "handle"))
+                EmptyHandler(),
+                ClassUtils.getMethod(
+                    EmptyHandler::class.java,
+                    "handle"
+                )
+            )
             apiInterceptor.preHandle(request as HttpServletRequest, response as HttpServletResponse, handler)
             chain?.doFilter(request, response)
             apiInterceptor.afterCompletion(request, response, handler, null)
