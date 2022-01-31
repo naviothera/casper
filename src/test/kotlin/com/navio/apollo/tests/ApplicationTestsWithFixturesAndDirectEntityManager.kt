@@ -4,17 +4,15 @@ import com.navio.apollo.casper.ApiFilterRegistrationConfiguration
 import com.navio.apollo.Application
 import com.navio.apollo.Configuration
 import com.navio.apollo.MoreConfig
-import com.navio.apollo.casper.CasperTestBase
 import com.navio.apollo.casper.DatabaseConfigurationState
 import com.navio.apollo.casper.EntityManagerTransactionContext
 import com.navio.apollo.casper.TemplateId
 import com.navio.apollo.casper.graphql.CasperGraphQLTestBase
 import com.navio.apollo.model.MyUser
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration
 import org.springframework.test.context.ContextConfiguration
-import javax.persistence.EntityManager
 import javax.sql.DataSource
 
 @ImportAutoConfiguration(Configuration::class, MoreConfig::class, ApiFilterRegistrationConfiguration::class)
@@ -87,4 +85,3 @@ data class EntityManagerFixtureGenerator(val initialUsers: List<MyUser>, val ent
         }
     }
 }
-

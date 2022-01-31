@@ -2,7 +2,7 @@
 # BASE IMAGE WITH DEPENDENCIES
 ################################################################################
 
-FROM gradle:6.2.2-jdk11 as dependencies
+FROM gradle:7.3-jdk11 as dependencies
 
 ENV APP_HOME=/app
 WORKDIR ${APP_HOME}

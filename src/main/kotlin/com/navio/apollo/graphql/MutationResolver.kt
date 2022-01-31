@@ -1,8 +1,8 @@
 package com.navio.apollo.graphql
 
-import com.coxautodev.graphql.tools.GraphQLMutationResolver
 import com.navio.apollo.model.MyUser
 import com.navio.apollo.repositories.MyUserRepo
+import graphql.kickstart.tools.GraphQLMutationResolver
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
 

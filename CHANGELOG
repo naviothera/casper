@@ -1,0 +1,26 @@
+VERSION 1.02.00 - 2022, Jan 31
+
+Update to Gradle 7.3, SpringBoot 2.6.0, Kotlin 1.5.32, JUnit Jupiter, target Java 11
+Add publications for sources and docs, a license and custom manifest
+
+================================================================================
+VERSION 1.01.00 - 2021, Aug 8
+
+Add a Casper pre-database loading hook for mock setup after Spring DI.
+
+================================================================================
+VERSION 1.00.02 - 2020, July 24
+
+Fix "Too Many Connections" errors when Application Context fails in startup
+
+================================================================================
+VERSION 1.00.01 - 2020, July 23
+
+Expose EntityManagerTransactionContext for simplifying transactions in tests
+
+================================================================================
+VERSION 1.00.00 - 2020, April 14
+
+Initial Casper library release
+
+================================================================================

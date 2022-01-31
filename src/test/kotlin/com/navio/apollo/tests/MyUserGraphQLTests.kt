@@ -2,7 +2,7 @@ package com.navio.apollo.tests
 
 import com.graphql.spring.boot.test.GraphQLTestTemplate
 import com.navio.apollo.model.MyUser
-import org.junit.Assert
+import org.junit.jupiter.api.Assertions
 
 // Fixtures must be globally unique because they are considered part of our "templates"
 val USER_1_MAJOR_TOM = MyUser(1, "Major Tom")
@@ -16,14 +16,16 @@ val CREATE_USER_MUTATION = """
         id
         name
       }
-    }""".trimIndent()
+    }"""
+    .trimIndent()
 
 val FIND_USER_QUERY = """
     query findUser(${"$"}userId:Int!){
       findUser(id:${"$"}userId){
         name
       }
-    }""".trimIndent()
+    }"""
+    .trimIndent()
 
 fun findUserVariables(user: MyUser): String {
     return """{"userId": ${user.id} }""".trimIndent()
@@ -35,7 +37,8 @@ fun createUserVariables(user: MyUser): String {
               "userId": ${user.id},
               "name": "${user.name}"
             }
-        """.trimIndent()
+        """
+        .trimIndent()
 }
 
 fun assertFindByIdGraphQL(user: MyUser, graphQLTestTemplate: GraphQLTestTemplate) {
@@ -43,9 +46,9 @@ fun assertFindByIdGraphQL(user: MyUser, graphQLTestTemplate: GraphQLTestTemplate
         FIND_USER_QUERY,
         findUserVariables(user)
     )
-    Assert.assertNotNull(findResponse)
-    Assert.assertTrue(findResponse.isOk)
-    Assert.assertEquals(user.name, findResponse.get("$.data.findUser.name"))
+    Assertions.assertNotNull(findResponse)
+    Assertions.assertTrue(findResponse.isOk)
+    Assertions.assertEquals(user.name, findResponse.get("$.data.findUser.name"))
 }
 
 fun assertNoSuchUser(user: MyUser, graphQLTestTemplate: GraphQLTestTemplate) {
@@ -53,9 +56,9 @@ fun assertNoSuchUser(user: MyUser, graphQLTestTemplate: GraphQLTestTemplate) {
         FIND_USER_QUERY,
         findUserVariables(user)
     )
-    Assert.assertNotNull(findResponse)
-    Assert.assertTrue(findResponse.isOk) // Failures are still returned as 200; have to inspect errors
-    Assert.assertTrue(findResponse.get("$.errors[0].message").contains("No value present"))
+    Assertions.assertNotNull(findResponse)
+    Assertions.assertTrue(findResponse.isOk) // Failures are still returned as 200; have to inspect errors
+    Assertions.assertTrue(findResponse.get("$.errors[0].message").contains("No value present"))
     // <200,{
     //   "errors" : [ {
     //     "message" : "Exception while fetching data (/findUser) : No value present",
@@ -77,8 +80,8 @@ fun assertCreateUserGraphQL(user: MyUser, graphQLTestTemplate: GraphQLTestTempla
         CREATE_USER_MUTATION,
         createUserVariables(user)
     )
-    Assert.assertNotNull(createResponse)
-    Assert.assertTrue(createResponse.isOk)
-    Assert.assertEquals(user.id, createResponse.get("$.data.createUser.id", Integer.TYPE))
-    Assert.assertEquals(user.name, createResponse.get("$.data.createUser.name"))
+    Assertions.assertNotNull(createResponse)
+    Assertions.assertTrue(createResponse.isOk)
+    Assertions.assertEquals(user.id, createResponse.get("$.data.createUser.id", Integer.TYPE))
+    Assertions.assertEquals(user.name, createResponse.get("$.data.createUser.name"))
 }

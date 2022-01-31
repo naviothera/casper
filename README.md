@@ -25,8 +25,11 @@ The name Casper was selected because the isolation should make tests invisible t
 each other (and hopefully the use of the library is itself friendly).
 
 ## How to Use Casper
-You can bring Casper into a project as a dependency using our maven repository with:
+Within the Navio team you can bring Casper into a project as a dependency using our maven repository with:
 ```compile "com.navio.apollo:apollo-framework-casper:1.00.00"```
+
+External to Navio you will need to build the Casper library with Gradle:
+```gradle build```
 
 ### Integrating Casper for Testing
 The Casper repository contains a working example of a Spring Boot Application with

@@ -2,16 +2,16 @@ package com.navio.apollo.casper
 
 import com.navio.apollo.casper.DatabaseConfigurationState.IsolatedTestTemplate
 import com.navio.apollo.casper.DatabaseConfigurationState.Uninitialized
-import org.junit.After
-import org.junit.Before
-import org.junit.Rule
-import org.junit.runner.RunWith
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.TestInfo
+import org.junit.jupiter.api.extension.ExtendWith
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.AutoConfigureDataJpa
 import org.springframework.boot.test.autoconfigure.orm.jpa.AutoConfigureTestEntityManager
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.test.context.junit4.SpringRunner
+import org.springframework.test.context.junit.jupiter.SpringExtension
 import javax.inject.Inject
 
 /**
@@ -42,7 +42,7 @@ import javax.inject.Inject
  * This class does not use the @GraphQLTest annotation; instead it exposes the GraphQLTestTemplate for use
  * per: https://github.com/graphql-java-kickstart/graphql-spring-boot/issues/182
  */
-@RunWith(SpringRunner::class)
+@ExtendWith(SpringExtension::class)
 @AutoConfigureDataJpa
 @AutoConfigureTestEntityManager
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -79,7 +79,7 @@ abstract class CasperTestBase {
 
     /**
      * Callback to the test class to indicate that fixture data has been loaded and any additional per-test
-     * configuration can now proceed using those resources.  This happens before each test (using @Before).
+     * configuration can now proceed using those resources.  This happens before each test (using @BeforeEach).
      *
      * Implementations that override this method SHOULD call localSetup on the super class.
      *
@@ -88,31 +88,25 @@ abstract class CasperTestBase {
     fun localSetUp(testTemplate: IsolatedTestTemplate) {}
 
     /**
-     * Callback after each test has completed execution (using @After).
+     * Callback after each test has completed execution (using @AfterEach).
      *
      * Implementations that override this method SHOULD call localTearDown on the super class.
      */
     fun localTearDown() {}
 
     /**
-     * Locally exposed capture of the JUnit Description for the executing test.
-     */
-    @get:Rule
-    var testDescription: TestDescription = TestDescription()
-
-    /**
      * Base setup method for the Casper framework to initialize a per-test database based on
      * the test template that the test depends on (via {@link #getTestTemplate}).
      */
-    @Before
-    fun setUp() {
+    @BeforeEach
+    fun setUp(testInfo: TestInfo) {
         beforeDbSetup()
         val testContext = dsManager.initializeTestDb(getTestTemplate())
         // Get the new CasperTestContext that has been initialized and set a custom GraphQL header value
         // that we can intercept on the web server to set the unique DB context there
         when (testContext) {
             is IsolatedTestTemplate -> {
-                log.info("Test ${testDescription.fullClassAndMethodName()} executing with isolated db: ${testContext.dbName}")
+                log.info("Test ${testInfo.getDisplayName()} executing with isolated db: ${testContext.dbName}")
                 // The Isolated test Database is ready, proceed with any local setup
                 entityManagerTransactionContext.inTransaction { localSetUp(testContext) }
             }
@@ -123,7 +117,7 @@ abstract class CasperTestBase {
     /**
      * Discard the temporary database that was used only for this test execution.
      */
-    @After
+    @AfterEach
     fun after() {
         /** Allow tests first to do any local tear down needed before the database is destroyed */
         localTearDown()
