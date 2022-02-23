@@ -5,7 +5,7 @@ stages:
 
 # Variables
 variables:
-  CICD_IMAGE: ${CI_REGISTRY}/naviothera/product/quantumsoft/shared-docker-images/cicd:latest
+  CICD_IMAGE: ${CI_REGISTRY}/naviothera/deployment/cicd:latest
   POSTGRES_IMAGE: 'postgres:10.6-alpine'
   TEST_POSTGRES_DB_NAME: navio_test
   TEST_POSTGRES_PASSWORD: test
@@ -16,6 +16,6 @@ include:
   - project: 'naviothera/deployment'
     ref: master
     file:
-      - '/lib-with-pg-test-definition.yaml'
-      - '/app-tests.yaml'
-      - '/publish-libs-mymaven.yaml'
+      - '/cicd_yaml/lib-with-pg-test-definition.yaml'
+      - '/cicd_yaml/app-tests.yaml'
+      - '/cicd_yaml/publish-libs-mymaven.yaml'
