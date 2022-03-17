@@ -17,7 +17,7 @@ Casper can set it up once and share fully isolated copies of that state with all
 tests.  Casper is also capable of providing any number of distinct fixtured templates
 as long as the base template is consistent for a given test class.
 
-Casper also makes use of flyway (flywaydb.org) for setting up the base database template
+Casper makes use of flyway (flywaydb.org) for setting up the base database template
 from which all fixtured template databases are derived.
 
 ## Why the Name Casper
@@ -34,8 +34,9 @@ External to Navio you will need to build the Casper library with Gradle:
 ### Integrating Casper for Testing
 The Casper repository contains a working example of a Spring Boot Application with
 a simple GraphQL service allowing standard CRUD methods on a basic repository in
-the `main` source set.  The Casper library is contained in the `casper` source set
-and is the only thing included in the published `casper` artifact.  The `test`
+the `main` source set.  The core Casper library is contained in the `casper` source set
+while the graphql extension to Casper is included in the `caspergraphql` source set.
+Both of these are published as independent artifacts to limit dependencies.  The `test`
 source set contains an example usage of the Casper library for testing the application
 defined in the `main` source set.
 
@@ -73,6 +74,14 @@ other non-persistence related tear down of collaborators or similar.
 
 *NOTE*: tests that override this method _MUST_ ensure the call to the super class
 `super.localTearDown()`.
+
+#### beforeDbSetup
+In some cases you may need to set up local resources BEFORE Casper loads your database
+fixtures, for example if loading those fixtures depends on other local services.
+In order to do this, you can override the 'beforeDbSetup()' method.
+* beforeDbSetup(): This method is invoked immediately _BEFORE_ Casper requests the 
+testTemplate and potentially initializes the fixture state for the template database. 
+NOTE that this will be called before getTestTemplate() and localSetUp() for EVERY test.
 
 ### Casper GraphQL Use
 In order to use per-test isolated databases within the test context and the Web
