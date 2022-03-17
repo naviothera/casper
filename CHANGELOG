@@ -1,3 +1,9 @@
+VERSION 1.03.00 - 2022, Mar 11
+
+Split out the Casper core functionality from GraphQL allowing more granular usage.
+Publish apollo-framework-casper and apollo-framework-caspergraphql artifacts.
+
+================================================================================
 VERSION 1.02.00 - 2022, Jan 31
 
 Update to Gradle 7.3, SpringBoot 2.6.0, Kotlin 1.5.32, JUnit Jupiter, target Java 11

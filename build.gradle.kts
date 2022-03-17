@@ -18,7 +18,7 @@ plugins {
     kotlin("plugin.noarg")
     kotlin("plugin.allopen")
     kotlin("kapt")
-    id("org.jetbrains.dokka") version "1.5.0"
+    id("org.jetbrains.dokka") version "1.6.10"
     id("org.flywaydb.flyway") version "8.0.5"
     signing
 }
@@ -37,6 +37,10 @@ ktlint {
         exclude("build/generated/**")
         include("src/**/kotlin/**/*.kt")
     }
+}
+
+tasks.dokkaJavadoc.configure {
+    setEnabled(false)
 }
 
 // For caching in CI/CD pipelines, from here: https://gist.github.com/matthiasbalke/3c9ecccbea1d460ee4c3fbc5843ede4a
@@ -92,7 +96,6 @@ dependencies {
     implementation("com.graphql-java-kickstart:graphql-spring-boot-starter-test:12.0.0")
     implementation("com.graphql-java:graphql-java:17.3")
 
-    // TODO: these really should be test dependencies, but graphql-spring-boot-starter seems to bring them in as implementation deps, and uses the wrong version.
     implementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     implementation("org.springframework.boot:spring-boot-test")
@@ -117,8 +120,13 @@ sourceSets {
         runtimeClasspath += output
     }
 
-    test {
+    create("caspergraphql") {
         compileClasspath += sourceSets["casper"].output
+        runtimeClasspath += output + compileClasspath
+    }
+
+    test {
+        compileClasspath += sourceSets["casper"].output + sourceSets["caspergraphql"].output
         runtimeClasspath += output + compileClasspath
     }
 }
@@ -136,11 +144,19 @@ dependencies {
     casperImplementation("org.springframework.boot:spring-boot-starter-json")
     casperImplementation("org.springframework.boot:spring-boot-starter-test")
     casperImplementation("org.springframework.boot:spring-boot-starter-data-jpa")
-    casperImplementation("com.graphql-java-kickstart:graphql-spring-boot-starter:12.0.0")
-    casperImplementation("com.graphql-java-kickstart:graphiql-spring-boot-starter:11.1.0")
-    casperImplementation("com.graphql-java-kickstart:graphql-spring-boot-starter-test:12.0.0")
-    casperImplementation("com.graphql-java:graphql-java:17.3")
     casperImplementation("org.flywaydb:flyway-core:8.0.5")
+    casperImplementation("org.apache.commons:commons-lang3:3.12.0")
+}
+
+val caspergraphqlImplementation: Configuration by configurations.getting {
+    extendsFrom(configurations["casperImplementation"])
+}
+
+dependencies {
+    caspergraphqlImplementation("com.graphql-java-kickstart:graphql-spring-boot-starter:12.0.0")
+    caspergraphqlImplementation("com.graphql-java-kickstart:graphiql-spring-boot-starter:11.1.0")
+    caspergraphqlImplementation("com.graphql-java-kickstart:graphql-spring-boot-starter-test:12.0.0")
+    caspergraphqlImplementation("com.graphql-java:graphql-java:17.3")
 }
 
 tasks.test {
@@ -168,23 +184,28 @@ val artifactMap = mapOf(
     "apollo-framework-casper" to mapOf(
         "version" to getArtifactVersion(version, branchPublicationName, snapshot),
         "groupId" to "${project.group}",
-        "libTaskName" to "buildMain",
-        "srcTaskName" to "buildSrc",
-        "taskDescription" to "Build jar from core graphql schema files",
+        "libTaskName" to "buildCasperLib",
+        "srcTaskName" to "buildCasperSrc",
+        "taskDescription" to "Build capser jar from core casper files",
         "sourceSet" to "casper",
         "publicationName" to "Core"
+    ),
+    "apollo-framework-caspergraphql" to mapOf(
+        "version" to getArtifactVersion(version, branchPublicationName, snapshot),
+        "groupId" to "${project.group}",
+        "libTaskName" to "buildCasperGraphqlLib",
+        "srcTaskName" to "buildCasperGraphqlSrc",
+        "taskDescription" to "Build caspergraphql jar from casper graphql files",
+        "sourceSet" to "caspergraphql",
+        "publicationName" to "GraphQL"
     )
 )
 
 val publicationsMap = mutableMapOf<String, Map<String, Any>>()
-tasks.dokkaJavadoc.configure {
-    outputDirectory.set(buildDir.resolve("dokka"))
-}
 
 artifactMap.map { (artifactName, map) ->
     // build jar
     val jar = tasks.create<Jar>(map.getValue("libTaskName")) {
-        dependsOn(tasks.dokkaJavadoc)
         archiveBaseName.set(artifactName)
         archiveVersion.set(map.getValue("version"))
         description = map.getValue("taskDescription").toString()
@@ -203,8 +224,8 @@ artifactMap.map { (artifactName, map) ->
             include("**")
         }
     }
-    val dokkaOutDir = buildDir.resolve("dokka/${map.get("sourceSet") ?: "main"}")
-    tasks.dokkaJavadoc.configure {
+    val dokka = tasks.create<org.jetbrains.dokka.gradle.DokkaTask>("dokka-" + map.getValue("srcTaskName")) {
+        val dokkaOutDir = buildDir.resolve("dokka/${map.get("sourceSet") ?: "main"}")
         outputDirectory.set(dokkaOutDir)
         dokkaSourceSets {
             named(map.get("sourceSet") ?: "main") { // Or source set name, for single-platform the default source sets are `main` and `test`
@@ -262,12 +283,13 @@ artifactMap.map { (artifactName, map) ->
             }
         }
     }
-    val docs = tasks.create<Jar>("javadocs") {
+    val docs = tasks.create<Jar>("javadoc-" + map.getValue("srcTaskName")) {
+        dependsOn(dokka)
         archiveBaseName.set(artifactName)
         archiveClassifier.set("javadoc")
         archiveVersion.set(map.getValue("version"))
         description = map.getValue("taskDescription").toString()
-        from(dokkaOutDir) {
+        from(dokka.outputDirectory) {
             include("**")
         }
     }
@@ -289,10 +311,10 @@ publishing {
     publications {
         repositories {
             mavenLocal()
-            maven(System.getenv("MAVEN_REPO_URL") ?: "") {
+            maven(System.getenv("GITLAB_MAVEN_REPO_URL") ?: "") {
                 credentials {
-                    username = System.getenv("MAVEN_REPO_USERNAME") ?: "myMavenRepo"
-                    password = System.getenv("MAVEN_REPO_PASSWORD") ?: ""
+                    username = "Deploy-Token"
+                    password = System.getenv("GITLAB_MAVEN_REPO_PASSWORD")
                 }
             }
         }

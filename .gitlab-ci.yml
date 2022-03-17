@@ -18,4 +18,4 @@ include:
     file:
       - '/cicd_yaml/lib-with-pg-test-definition.yaml'
       - '/cicd_yaml/app-tests.yaml'
-      - '/cicd_yaml/publish-libs-mymaven.yaml'
+      - '/cicd_yaml/publish-libs-gitlab-maven.yaml'
