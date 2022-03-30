@@ -83,6 +83,9 @@ class TestIsolatedTemplatizingDatabaseManager {
     @Value("\${casper.drop-test-dbs:true}")
     private var dropTestDatabases: Boolean = true
 
+    @Value("\${casper.enable-template-db-reuse:false}")
+    private var enableTemplateReuse: Boolean = false
+
     /**
      * A memoizing supplier for the base TemplateID derived from either a configured template name if
      * specified in the configuration or the database name from the supplied db url (suffixed with _t)
@@ -143,10 +146,15 @@ class TestIsolatedTemplatizingDatabaseManager {
         }
 
         override fun initialize(templateName: String, datasource: DataSource) {
+            log.debug("Migrating initial datasource with Flyway")
             // Create the Flyway instance and point it to the database
             val flyway = Flyway.configure().dataSource(datasource).load()
             // Run the migration to get base table structure
             flyway.migrate()
+            // Create the base "casper"
+            withConnection(datasource) { connection ->
+                connection.prepareCall("create table if not exists casper ( hash text not null )").execute()
+            }
         }
     }
 
@@ -192,29 +200,104 @@ class TestIsolatedTemplatizingDatabaseManager {
         val templateDbName = Optional.ofNullable(baseTemplate)
             .map { "${it}_${templateId.id}" }
             .orElse(templateId.id)
-        val create = Optional.ofNullable(baseTemplate)
-            .map { "create database $templateDbName template $it" }
-            .orElse("create database $templateDbName")
-        withBaseConnection { connection ->
-            connection.prepareCall("drop database if exists $templateDbName").execute()
-            connection.prepareCall(create).execute()
+
+        // If we are allowed to re-use the template we need to determine if it exists and can be reused
+        var reuseExistingTemplateDb = when (enableTemplateReuse) {
+            true -> initializer.getFixtureHash()?.let { checkCasperTemplateHash(templateDbName, it) } ?: false
+            else -> false
         }
-        // Add to the set of active templates so we do not have to do this again (this run)
-        activeTemplates.put(templateId, templateDbName)
+        if (reuseExistingTemplateDb) {
+            // Add to the set of active templates so we do not have to check this again (this run)
+            activeTemplates.put(templateId, templateDbName)
+            log.debug("Reusing existing Template: $templateDbName")
+        } else {
+            val create = Optional.ofNullable(baseTemplate)
+                .map { "create database $templateDbName template $it" }
+                .orElse("create database $templateDbName")
+            withBaseConnection { connection ->
+                connection.prepareCall("drop database if exists $templateDbName").execute()
+                connection.prepareCall(create).execute()
+            }
+            // Add to the set of active templates so we do not have to do this again (this run)
+            activeTemplates.put(templateId, templateDbName)
 
-        // While we are in the process of creating the template we need to share the DataSource with
-        // the persistence contexts so we add it temporarily to our constructed sources
-        val datasource = makeSource(templateDbName)
-        constructedSources.put(templateDbName, datasource)
+            // While we are in the process of creating the template we need to share the DataSource with
+            // the persistence contexts so we add it temporarily to our constructed sources
+            val datasource = makeSource(templateDbName)
+            constructedSources.put(templateDbName, datasource)
 
-        // While the template is in our mapping proceed to set it up
-        initializer.initialize(templateDbName, datasource)
+            // While the template is in our mapping proceed to set it up
+            initializer.initialize(templateDbName, datasource)
+            initializer.getFixtureHash()?.let { hash ->
+                withConnection(datasource) { connection ->
+                    // Add a casper specific table to hold persistent "hash" values
+                    // Since we either reuse the Template DB -or- drop and recreate there should only ever be one row
+                    // Set the hash for the template in case template reuse is desired
+                    connection.prepareStatement("delete from casper").execute()
+                    val statement = connection.prepareStatement("insert into casper (hash) values (?)")
+                    statement.setString(1, hash)
+                    statement.executeUpdate()
+                }
+            }
 
-        // After running the context initialization process we need to shut down the connection to the
-        // database in order to use it as a template
-        removeAndStop(templateDbName)
-        log.debug("Initialized Template: $templateDbName")
+            // After running the context initialization process we need to shut down the connection to the
+            // database in order to use it as a template
+            removeAndStop(templateDbName)
+            log.debug("Initialized Template: $templateDbName")
+        }
         return templateDbName
+    }
+
+    private fun checkCasperTemplateHash(templateDbName: String, expectedHash: String): Boolean {
+        var dbExists = false
+        // Using the base connection attempt to query the pg_database table from the catalog (pg_catalog is effectively always in the path)
+        // BEFORE we attempt to connect to it to avoid logging errors when the database does not exist
+        withBaseConnection { connection ->
+            val dbQuery = connection.prepareCall("SELECT datname FROM pg_database WHERE datname=?")
+            dbQuery.setString(1, templateDbName)
+            val results = dbQuery.executeQuery()
+            while (results.next()) {
+                val name = results.getString(1)
+                if (!results.wasNull() && name.equals(templateDbName)) {
+                    dbExists = true
+                }
+            }
+        }
+        var hashesMatch = false
+        if (dbExists) {
+            val temporaryDs = makeSource(templateDbName)
+            try {
+                withConnection(temporaryDs) { connection ->
+                    // If reuse has been enabled and the template DB exists but was created from an earlier version of
+                    // casper it will not have a casper table, defensively create to avoid SQL Exception
+                    connection.prepareCall("create table if not exists casper ( hash text not null )").execute()
+                    // Since we either reuse the Template DB completely -or- drop and recreate there should only ever be one row
+                    val results = connection.prepareCall("select hash from casper limit 1")
+                        .executeQuery()
+                    while (results.next()) {
+                        val hash = results.getString(1)
+                        if (!results.wasNull() && hash.equals(expectedHash)) {
+                            // The hash matches the configured hash, the template can be reused without re-initiatlizing
+                            hashesMatch = true
+                        } else {
+                            log.debug(
+                                "Unable to reuse template DB '$templateDbName'. " +
+                                    "Template exists but stored hash did not match current hash. " +
+                                    "Stored: '$hash', Current: '$expectedHash'"
+                            )
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                // Not able to re-use existing template
+                log.debug("Unable to verify reuse for template db '$templateDbName' : ${e.message}", e)
+            } finally {
+                close(temporaryDs)
+            }
+        } else {
+            log.debug("Template DB '$templateDbName' was not found in system catalog, cannot be reused")
+        }
+        return dbExists && hashesMatch
     }
 
     /**
@@ -293,7 +376,10 @@ class TestIsolatedTemplatizingDatabaseManager {
     }
 
     private fun removeAndStop(dbName: String) {
-        val dataSource = constructedSources.remove(dbName)!!
+        close(constructedSources.remove(dbName)!!)
+    }
+
+    private fun close(dataSource: DataSource) {
         when (dataSource) {
             is Closeable -> dataSource.close()
         }

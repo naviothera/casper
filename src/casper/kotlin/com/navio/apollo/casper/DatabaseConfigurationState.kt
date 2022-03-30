@@ -28,6 +28,19 @@ sealed class DatabaseConfigurationState {
             abstract fun getTemplateId(): TemplateId
 
             /**
+             * Optionally return a "hash" for the fixture data that is expected to identify whether the state of
+             * the fixtures has changed.  If the hash is present and matches AND Casper has been enabled to re-use
+             * template databases via the "casper.enable-template-db-reuse" flag then Casper will NOT
+             * drop and re-create the template db with fixtures on every run, potentially speeding up
+             * execution significantly.  Note that caution should be exercised to ensure nothing in the
+             * fixture setup has changed that might affect testing.
+             *
+             * The default implementation returns null, which never matches; if you want to enable template reuse
+             * you must override this and return a hash value that is consistent with the actual fixture data.
+             */
+            open fun getFixtureHash(): String? = null
+
+            /**
              * Callback hook to provide template database specific setup.
              * At this point the DataSource is configured and active and has been created from a template of the base schema
              * that was applied via FlyWay. The database for this template can now be modified in any way; note that after

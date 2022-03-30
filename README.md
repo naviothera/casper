@@ -54,6 +54,18 @@ the base fixture data for this test template if the template has not already
 been initialized.  It also is responsible for creating the unique name for
 the fixture data set which allows template re-use across tests.
 
+There are two allowed return types for the getTestTemplate call, either the object 
+`DatabaseConfigurationState.TemplateConfiguration.NoAddedFixtures` or a class extending 
+`DatabaseConfigurationState.TemplateConfiguration.FixtureGenerator()`.
+
+Returning `NoAddedFixtures` indicates to Casper that the default database that has been
+locally migrated using Flyway is all the test requires for setup.
+
+Returning a `FixtureGenerator` allows for specifying additional setup to be run and used
+as a base template for the test class and any other test classes that share the same
+TemplateId.  See the documentation of `DatabaseConfigurationState.TemplateConfiguration`
+for full details as well as some example uses in the test module.
+
 #### localSetup and tearDown (@Before/@After)
 Classes that need to do additional setup before or clean up after each test can
 do so by overriding the 'localSetup' and 'localTearDown' methods.
@@ -86,8 +98,8 @@ NOTE that this will be called before getTestTemplate() and localSetUp() for EVER
 ### Casper GraphQL Use
 In order to use per-test isolated databases within the test context and the Web
 servlet context (which runs in a separate Thread) it is necessary to pass the 
-information between the test client and the web service.  Casper does this by
-adding a custom Header to the GraphQLTestTemplate and a Filter to the Web MVC Service
+information between the test client and the web service.  The Casper GraphQL library does 
+this by adding a custom Header to the GraphQLTestTemplate and a Filter to the Web MVC Service
 to intercept the request, read the custom header, and set the CasperTestContext for 
 the Web servlet. This means that calls to a GraphQL endpoint from test that use
 Casper should utilize the exposed `graphQLTestTemplate` from the CasperTestBase
@@ -105,6 +117,29 @@ file in the root (typically in the resources) that contains the following proper
 - spring.datasource.password=${DB_PASSWORD:}
 - (OPITONAL) spring.datasource.test.template-dbname=${TEMPLATE_DB_NAME:cspr_mytests}
 - (OPTIONAL) casper.drop-test-dbs (Boolean, defaults to true)
+- (OPTIONAL) casper.enable-template-db-reuse (Boolean, defaults to false)
+
+### Enabling Template Sharing Across Casper Runs
+By default, Casper does not re-use the template databases that it creates across runs.  This
+is the safest way to be sure that any changes to the data or logic in setting up the database
+state is properly respected to limit surprises.  However, if there are a large number of fixtures
+being loaded it can take some time to get the database templates set up for testing.  If you
+understand this risk and are looking for ways to speed up your test runs Casper can be set up
+to re-use database templates with all their fixture data across multiple runs.  To do this there
+are 3 things needed:
+1) You must enable template reuse by setting the Spring property `casper.enable-template-db-reuse` to true
+2) You must generate a consistent TemplateId representing the unique db templates you wish to reuse
+3) You must override the `getFixtureHash()` method on your FixtureGenerator to produce a value that
+can be used to determine if the fixture data to be loaded is in fact the same.  For example if you
+are loading entities via an EntityManager it might be reasonable to compute a hash of the entities
+you intend to load along the lines of `Objects.hashCode(entities).toString()`.  Casper stores the
+hash in a "casper" table that it creates as a String and compares the value with what is in the database 
+already for the template; this allows for significant flexibility in how the hash is calculated, however
+very long values are discouraged for performance reasons.
+
+If reuse is enabled, the template db exists, and the hashes match across runs then Casper will
+**not drop and recreate the database**, will **skip the call to initialize** the template,
+and **will reuse the template database** that is already present and initiliazed from a previous run.
 
 ### Casper Use of ThreadLocal
 Casper makes use of ThreadLocal for passing context state between components within the

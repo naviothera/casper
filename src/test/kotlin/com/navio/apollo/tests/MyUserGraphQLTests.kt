@@ -5,6 +5,8 @@ import com.navio.apollo.model.MyUser
 import org.junit.jupiter.api.Assertions
 
 // Fixtures must be globally unique because they are considered part of our "templates"
+// We are reusing the ids 1&2 to show that DB state is per test
+// e.g. USER_1 and USER_4 cannot both be inserted within the same test because id is the primary key and they would conflict
 val USER_1_MAJOR_TOM = MyUser(1, "Major Tom")
 val USER_2_WALTER_WITHERS = MyUser(2, "Walter Withers")
 val USER_4_CHEATER_CHEATERSON = MyUser(1, "Cheater Cheaterson")

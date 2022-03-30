@@ -4,7 +4,7 @@ import javax.persistence.Entity
 import javax.persistence.Id
 
 @Entity
-class MyUser(
+data class MyUser(
     @Id
     val id: Int = 0,
     var name: String
