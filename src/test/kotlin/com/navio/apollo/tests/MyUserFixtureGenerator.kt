@@ -3,6 +3,7 @@ package com.navio.apollo.tests
 import com.navio.apollo.casper.DatabaseConfigurationState
 import com.navio.apollo.casper.TemplateId
 import com.navio.apollo.model.MyUser
+import java.util.Objects
 import javax.sql.DataSource
 
 data class MyUserFixtureGenerator(val initialUsers: List<MyUser>, val myUserEntityLoader: MyUserEntityLoader) :
@@ -10,6 +11,10 @@ data class MyUserFixtureGenerator(val initialUsers: List<MyUser>, val myUserEnti
 
     override fun getTemplateId(): TemplateId {
         return TemplateId(toString())
+    }
+
+    override fun getFixtureHash(): String {
+        return Objects.hashCode(initialUsers).toString()
     }
 
     override fun toString(): String {
