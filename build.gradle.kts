@@ -257,19 +257,19 @@ artifactMap.map { (artifactName, map) ->
                 // Specifies the location of the project source code on the Web.
                 // If provided, Dokka generates "source" links for each declaration.
                 // Repeat for multiple mappings
-                /*sourceLink {
+                sourceLink {
                     // Unix based directory relative path to the root of the project (where you execute gradle respectively).
-                    localDirectory.set(file("src/main/kotlin"))
+                    localDirectory.set(file("src/${map.get("sourceSet") ?: "main"}/kotlin"))
 
                     // URL showing where the source code can be accessed through the web browser
                     remoteUrl.set(
-                        java.net.URL(
-                            "https://github.com/cy6erGn0m/vertx3-lang-kotlin/blob/master/src/main/kotlin"
-                        )
+                        uri(
+                            "https://github.com/naviothera/casper/tree/master/src/${map.get("sourceSet") ?: "main"}/kotlin"
+                        ).toURL()
                     )
                     // Suffix which is used to append the line number to the URL. Use #L for GitHub
                     remoteLineSuffix.set("#L")
-                }*/
+                }
 
                 // Used for linking to JDK documentation
                 jdkVersion.set(11)
@@ -328,11 +328,7 @@ publishing {
                 artifact(publication.getValue("docs"))
                 pom {
                     this.description.set("A library for testing Spring GraphQL endpoints backed by Postgres with per-test isolation and shared database templating.")
-                    this.url.set("https://gitlab.com/naviothera/product/apollo-framework-casper")
-                    /*properties.set(mapOf(
-                        "myProp" to "value",
-                        "prop.with.dots" to "anotherValue"
-                    ))*/
+                    this.url.set("https://github.com/naviothera/casper")
                     licenses {
                         license {
                             this.name.set("The Apache License, Version 2.0")
@@ -347,9 +343,9 @@ publishing {
                         }
                     }
                     scm {
-                        this.connection.set("scm:git:git@gitlab.com:naviothera/product/apollo-framework-casper.git")
-                        this.developerConnection.set("scm:git:git@gitlab.com:naviothera/product/apollo-framework-casper.git")
-                        this.url.set("https://gitlab.com/naviothera/product/apollo-framework-casper")
+                        this.connection.set("scm:git:git@github.com:naviothera/casper.git")
+                        this.developerConnection.set("scm:git:git@github.com:naviothera/casper.git")
+                        this.url.set("https://github.com/naviothera/casper")
                     }
                 }
             }
