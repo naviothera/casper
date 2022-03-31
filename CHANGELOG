@@ -1,3 +1,8 @@
+VERSION 1.04.01 - 2022, Mar 31
+
+Modify SCM links to point at GitHub public repo and link source from Javadocs.
+
+================================================================================
 VERSION 1.04.00 - 2022, Mar 18
 
 Add the ability for Casper to reuse template databases across multiple runs.
