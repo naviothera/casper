@@ -21,8 +21,9 @@ Casper makes use of flyway (flywaydb.org) for setting up the base database templ
 from which all fixtured template databases are derived.
 
 ## Why the Name Casper
-The name Casper was selected because the isolation should make tests invisible to 
-each other (and hopefully the use of the library is itself friendly).
+The name Casper is a reference to [Casper the Friendly Ghost](https://en.wikipedia.org/wiki/Casper_the_Friendly_Ghost).
+It was selected because the isolation should make tests invisible to 
+each other and hopefully the use of the library is itself friendly.
 
 ## How to Use Casper
 Within the Navio team you can bring Casper into a project as a dependency using our maven repository with:
